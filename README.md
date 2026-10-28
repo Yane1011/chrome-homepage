@@ -25,16 +25,24 @@ To update, pull the latest code and press the reload icon on the extension card.
 - Shift+Enter always searches the web, and Ctrl/⌘+Enter opens the result in a new tab.
 - Start typing anywhere on the page to search, or press `/`.
 
-**Widgets** (off by default)
+**Widgets** (off by default, turned on in Settings › Widgets). On wide windows they sit in columns on the left and right of the grid, centred vertically. On narrow windows they move into a drawer, opened with the ☰ button. Each widget can be put on either side and reordered.
 - **Weather:** a five-day forecast for any city from [Open-Meteo](https://open-meteo.com). No API key needed.
-- **Tasks:** a simple to-do list.
-- **Quick notes:** saved as you type.
+- **Today's focus:** one thing to get done today. It resets at midnight.
+- **To do** and **Notes**.
+- **Countdown:** days (or hours) left until your dates. They also show as dots on the calendar.
+- **World clocks:** the time in other cities, with the offset from yours.
+- **Timer:** a countdown with presets and a chime, plus a stopwatch. It's shared by all open tabs.
+- **Habits:** tick off each day, with streaks.
+- **Calendar:** a month view, with the week starting on Monday or Sunday.
+- **Sun and moon:** sunrise, sunset, day length and the sun's position, plus the moon phase.
+- **Tides:** high and low tides for a coastal city (Open-Meteo Marine).
+- **CPU** and **Memory:** live usage of this computer (`chrome.system.cpu` / `chrome.system.memory`).
 
-**Layouts:** Centered, Widgets right, Widgets left, Split, Top bar, Dock and Minimal.
+**Layouts:** Beside grid (the default), Widgets right, Widgets left, Widgets below, Top bar, Dock and Minimal.
 
 **Backgrounds**
 - 13 gradients.
-- 16 animated, code-drawn scenes: Aurora, Nebula, Constellations, Starfield, Gold, Malachite, Black marble, Garnet velvet, Suminagashi, Indigo wash, Waves, Bubbles, Lava lamp, Snowfall, Night rain and Synthwave.
+- 32 animated, code-drawn scenes. These include Aurora, Nebula, Constellations, Galaxy, Meteor shower, Northern lights, three suminagashi styles (classic, black and gold), Plasma, Code rain, Fireflies, Embers, Sakura, Ripples, Dunes, Topography, Hex pulse and Synthwave.
 - A solid colour, or your own image.
 - Dim and blur sliders.
 
@@ -76,7 +84,8 @@ js/defaults.js       Default settings, starter shortcuts, gradients, layouts
 js/ops.js            Shortcut/folder operations
 js/tiles.js          Essentials, folders, folder overlay, drag and drop
 js/search.js         Search bar and shortcut filtering
-js/widgets.js        Weather, tasks, notes
+js/widgets.js        Widget registry and placement
+js/widgets/*.js      The widgets (basic, planning, time, nature, system)
 js/backgrounds.js    Gradients, images and animated canvas backgrounds
 js/settings.js       Settings panel and settings search
 js/dialogs.js        Modals, shortcut editor, context menu

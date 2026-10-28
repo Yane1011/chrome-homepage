@@ -164,6 +164,32 @@ function linear(ctx, H, stops) {
   return g;
 }
 
+// Floating-ink rings, as in the Japanese marbling art.
+function suminagashi(bg, strong, weak) {
+  return (ctx) => ({
+    draw(t, W, H) {
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+      const cx = W * 0.5 + Math.sin(t * 0.05) * W * 0.1;
+      const cy = H * 0.5 + Math.cos(t * 0.04) * H * 0.1;
+      const m = Math.hypot(W, H);
+      for (let i = 0; i < 26; i++) {
+        const r = (i * 42 + t * 6) % (m * 0.75);
+        ctx.beginPath();
+        for (let a = 0; a <= TAU + 0.01; a += 0.05) {
+          const wob = Math.sin(a * 3 + t * 0.2 + i) * 14 + Math.sin(a * 7 - t * 0.15) * 6;
+          const x = cx + Math.cos(a) * (r + wob);
+          const y = cy + Math.sin(a) * (r + wob) * 0.85;
+          a === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = i % 3 === 0 ? strong : weak;
+        ctx.lineWidth = i % 3 === 0 ? 2.5 : 1;
+        ctx.stroke();
+      }
+    },
+  });
+}
+
 const PAINTERS = {
   aurora: blobs(['rgba(46,255,170,.55)', 'rgba(0,140,255,.5)', 'rgba(150,60,255,.45)', 'rgba(0,255,220,.35)'], '#030b1a'),
   nebula: blobs(['rgba(255,60,170,.45)', 'rgba(120,60,255,.5)', 'rgba(40,120,255,.4)', 'rgba(255,140,60,.25)', 'rgba(80,0,120,.6)'], '#07020f'),
@@ -172,28 +198,9 @@ const PAINTERS = {
   velvet: blobs(['rgba(160,10,40,.6)', 'rgba(90,0,30,.7)', 'rgba(220,60,80,.35)', 'rgba(40,0,15,.8)'], '#120005', { speed: 0.6 }),
   indigo: blobs(['rgba(40,60,160,.6)', 'rgba(20,30,100,.7)', 'rgba(90,110,210,.35)', 'rgba(10,15,60,.8)'], '#050818', { speed: 0.5 }),
   lava: blobs(['rgba(255,80,0,.8)', 'rgba(255,0,90,.7)', 'rgba(255,170,0,.6)', 'rgba(170,0,60,.7)'], '#1a0008', { speed: 1.4, blend: 'screen' }),
-  suminagashi: (ctx) => ({
-    draw(t, W, H) {
-      ctx.fillStyle = '#f4f1ea';
-      ctx.fillRect(0, 0, W, H);
-      const cx = W * 0.5 + Math.sin(t * 0.05) * W * 0.1;
-      const cy = H * 0.5 + Math.cos(t * 0.04) * H * 0.1;
-      const m = Math.hypot(W, H);
-      for (let i = 0; i < 26; i++) {
-        const r = ((i * 42 + t * 6) % (m * 0.75));
-        ctx.beginPath();
-        for (let a = 0; a <= TAU + 0.01; a += 0.05) {
-          const wob = Math.sin(a * 3 + t * 0.2 + i) * 14 + Math.sin(a * 7 - t * 0.15) * 6;
-          const x = cx + Math.cos(a) * (r + wob);
-          const y = cy + Math.sin(a) * (r + wob) * 0.85;
-          a === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = i % 3 === 0 ? 'rgba(30,40,70,.55)' : 'rgba(30,40,70,.18)';
-        ctx.lineWidth = i % 3 === 0 ? 2.5 : 1;
-        ctx.stroke();
-      }
-    },
-  }),
+  suminagashi: suminagashi('#f4f1ea', 'rgba(30,40,70,.55)', 'rgba(30,40,70,.18)'),
+  suminagashiNoir: suminagashi('#09090b', 'rgba(235,235,242,.5)', 'rgba(235,235,242,.13)'),
+  suminagashiGold: suminagashi('#0b0906', 'rgba(222,180,90,.6)', 'rgba(222,180,90,.14)'),
   marble: (ctx) => ({
     draw(t, W, H) {
       ctx.fillStyle = '#0b0b0d';
@@ -359,6 +366,296 @@ const PAINTERS = {
       }
     },
   }),
+  fireflies: particles({
+    count: 70,
+    base: (ctx, W, H) => {
+      ctx.fillStyle = linear(ctx, H, ['#020b08', '#062018', '#0b2e1f']);
+      ctx.fillRect(0, 0, W, H);
+    },
+    init: (W, H) => ({ x: rand(0, W), y: rand(0, H), ph: rand(0, TAU), sp: rand(0.3, 1), r: rand(1.5, 3) }),
+    draw(ctx, p, t, W, H) {
+      const x = p.x + Math.sin(t * 0.3 * p.sp + p.ph) * 40;
+      const y = p.y + Math.cos(t * 0.25 * p.sp + p.ph * 2) * 30;
+      const glow = (Math.sin(t * 2 * p.sp + p.ph) + 1) / 2;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, p.r * 8);
+      g.addColorStop(0, `rgba(220,255,120,${0.9 * glow})`);
+      g.addColorStop(1, 'rgba(220,255,120,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x - p.r * 8, y - p.r * 8, p.r * 16, p.r * 16);
+    },
+  }),
+  matrix: (ctx) => {
+    const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF';
+    let cols = [];
+    const size = 16;
+    return {
+      resize(W, H) {
+        cols = Array.from({ length: Math.ceil(W / size) }, () => ({ y: rand(-H, 0), v: rand(60, 160) }));
+      },
+      draw(t, W, H) {
+        if (!cols.length) this.resize(W, H);
+        ctx.fillStyle = '#000503';
+        ctx.fillRect(0, 0, W, H);
+        ctx.font = `${size}px ui-monospace, monospace`;
+        cols.forEach((c, i) => {
+          c.y += c.v * 0.016;
+          if (c.y - 20 * size > H) Object.assign(c, { y: rand(-200, 0), v: rand(60, 160) });
+          for (let k = 0; k < 20; k++) {
+            const y = c.y - k * size;
+            if (y < -size || y > H + size) continue;
+            const ch = chars[(Math.floor(y / size) * 7 + i * 13 + Math.floor(t * 4) * (k === 0 ? 1 : 0)) % chars.length];
+            ctx.fillStyle = k === 0 ? 'rgba(220,255,230,.95)' : `rgba(0,255,120,${0.75 * (1 - k / 20)})`;
+            ctx.fillText(ch, i * size, y);
+          }
+        });
+      },
+    };
+  },
+  plasma: (ctx) => {
+    const off = document.createElement('canvas');
+    off.width = 96;
+    off.height = 60;
+    const octx = off.getContext('2d');
+    const img = octx.createImageData(off.width, off.height);
+    return {
+      draw(t, W, H) {
+        const { width: w, height: h, } = off;
+        for (let y = 0; y < h; y++)
+          for (let x = 0; x < w; x++) {
+            const v = Math.sin(x * 0.08 + t * 0.7) + Math.sin(y * 0.1 - t * 0.5) + Math.sin((x + y) * 0.05 + t * 0.3) + Math.sin(Math.hypot(x - w / 2, y - h / 2) * 0.12 - t);
+            const i = (y * w + x) * 4;
+            img.data[i] = 90 + 80 * Math.sin(v * Math.PI * 0.5);
+            img.data[i + 1] = 30 + 40 * Math.sin(v * Math.PI * 0.5 + 2);
+            img.data[i + 2] = 140 + 100 * Math.sin(v * Math.PI * 0.5 + 4);
+            img.data[i + 3] = 255;
+          }
+        octx.putImageData(img, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(off, 0, 0, W, H);
+      },
+    };
+  },
+  ribbons: (ctx) => ({
+    draw(t, W, H) {
+      ctx.fillStyle = linear(ctx, H, ['#010409', '#03111f', '#062433']);
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter';
+      const colors = ['rgba(40,255,170,', 'rgba(60,160,255,', 'rgba(170,90,255,'];
+      for (let k = 0; k < 3; k++) {
+        for (let x = 0; x <= W; x += 6) {
+          const y = H * (0.3 + k * 0.08) + Math.sin(x * 0.004 + t * (0.3 + k * 0.1) + k) * 60 + Math.sin(x * 0.011 - t * 0.2) * 25;
+          const hgt = 120 + Math.sin(x * 0.006 + t * 0.4 + k * 2) * 60;
+          const g = ctx.createLinearGradient(0, y - hgt, 0, y);
+          g.addColorStop(0, colors[k] + '0)');
+          g.addColorStop(1, colors[k] + '.16)');
+          ctx.fillStyle = g;
+          ctx.fillRect(x, y - hgt, 6, hgt);
+        }
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    },
+  }),
+  galaxy: particles({
+    count: 900,
+    base: (ctx, W, H) => {
+      const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
+      g.addColorStop(0, '#1a0f2e');
+      g.addColorStop(1, '#020107');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    },
+    init: () => {
+      const arm = Math.floor(rand(0, 3));
+      const d = Math.pow(Math.random(), 1.6);
+      return { d, a: arm * (TAU / 3) + d * 5 + rand(-0.35, 0.35), s: rand(0.6, 1.8), c: Math.random() };
+    },
+    draw(ctx, p, t, W, H) {
+      const R = Math.min(W, H) * 0.48;
+      const a = p.a + t * 0.04 * (1.2 - p.d);
+      const x = W / 2 + Math.cos(a) * p.d * R * 1.4;
+      const y = H / 2 + Math.sin(a) * p.d * R * 0.75;
+      ctx.fillStyle = p.c > 0.85 ? 'rgba(255,190,240,.9)' : p.c > 0.6 ? 'rgba(170,190,255,.8)' : `rgba(255,255,255,${0.35 + (1 - p.d) * 0.5})`;
+      ctx.fillRect(x, y, p.s, p.s);
+    },
+  }),
+  meteors: (ctx) => {
+    const stars = Array.from({ length: 260 }, () => ({ x: Math.random(), y: Math.random(), r: rand(0.3, 1.4), ph: rand(0, TAU) }));
+    const trails = [];
+    return {
+      draw(t, W, H) {
+        ctx.fillStyle = linear(ctx, H, ['#00010a', '#060a22', '#141433']);
+        ctx.fillRect(0, 0, W, H);
+        for (const s of stars) {
+          ctx.fillStyle = `rgba(255,255,255,${0.4 + 0.4 * Math.sin(t * 1.5 + s.ph)})`;
+          ctx.fillRect(s.x * W, s.y * H, s.r, s.r);
+        }
+        if (Math.random() < 0.025) trails.push({ x: rand(W * 0.2, W * 1.1), y: rand(-50, H * 0.4), life: 1, v: rand(8, 14) });
+        for (let i = trails.length - 1; i >= 0; i--) {
+          const m = trails[i];
+          m.x -= m.v;
+          m.y += m.v * 0.55;
+          m.life -= 0.015;
+          if (m.life <= 0) {
+            trails.splice(i, 1);
+            continue;
+          }
+          const g = ctx.createLinearGradient(m.x, m.y, m.x + 120, m.y - 66);
+          g.addColorStop(0, `rgba(255,255,255,${m.life})`);
+          g.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.strokeStyle = g;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(m.x, m.y);
+          ctx.lineTo(m.x + 120, m.y - 66);
+          ctx.stroke();
+        }
+      },
+    };
+  },
+  topo: (ctx) => ({
+    draw(t, W, H) {
+      ctx.fillStyle = '#0e1512';
+      ctx.fillRect(0, 0, W, H);
+      ctx.lineWidth = 1;
+      for (let k = 0; k < 34; k++) {
+        ctx.beginPath();
+        const base = (k / 34) * H * 1.2 - H * 0.1;
+        for (let x = -10; x <= W + 10; x += 8) {
+          const y = base + Math.sin(x * 0.006 + k * 0.35 + t * 0.12) * 40 + Math.sin(x * 0.0021 - k * 0.2 - t * 0.07) * 70 + Math.cos(x * 0.013 + k) * 8;
+          x === -10 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = k % 5 === 0 ? 'rgba(160,220,180,.35)' : 'rgba(160,220,180,.12)';
+        ctx.stroke();
+      }
+    },
+  }),
+  embers: particles({
+    count: 140,
+    base: (ctx, W, H) => {
+      ctx.fillStyle = linear(ctx, H, ['#050100', '#1a0602', '#3d0f02']);
+      ctx.fillRect(0, 0, W, H);
+    },
+    init: (W, H) => ({ x: rand(0, W), y: rand(0, H), v: rand(20, 70), r: rand(0.8, 2.6), ph: rand(0, TAU) }),
+    draw(ctx, p, t, W, H) {
+      p.y -= p.v * 0.016;
+      if (p.y < -10) Object.assign(p, { y: H + 10, x: rand(0, W) });
+      const x = p.x + Math.sin(t * 1.3 + p.ph) * 18;
+      const life = p.y / H;
+      ctx.fillStyle = `rgba(255,${120 + 100 * (1 - life)},40,${0.3 + life * 0.7})`;
+      ctx.shadowColor = 'rgba(255,120,30,.8)';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(x, p.y, p.r, 0, TAU);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    },
+  }),
+  sakura: particles({
+    count: 60,
+    base: (ctx, W, H) => {
+      ctx.fillStyle = linear(ctx, H, ['#fdeef3', '#f7dbe6', '#eed3e8']);
+      ctx.fillRect(0, 0, W, H);
+    },
+    init: (W, H) => ({ x: rand(0, W), y: rand(0, H), v: rand(20, 50), s: rand(5, 10), ph: rand(0, TAU), rot: rand(0, TAU) }),
+    draw(ctx, p, t, W, H) {
+      p.y += p.v * 0.016;
+      p.rot += 0.01;
+      if (p.y > H + 20) Object.assign(p, { y: -20, x: rand(0, W) });
+      const x = p.x + Math.sin(t * 0.8 + p.ph) * 40;
+      ctx.save();
+      ctx.translate(x, p.y);
+      ctx.rotate(p.rot + Math.sin(t + p.ph));
+      ctx.scale(1, 0.6 + 0.4 * Math.sin(t * 2 + p.ph));
+      ctx.fillStyle = 'rgba(240,140,170,.75)';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, p.s, p.s * 0.6, 0, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    },
+  }),
+  ripples: (ctx) => {
+    const drops = [];
+    return {
+      draw(t, W, H) {
+        ctx.fillStyle = linear(ctx, H, ['#04202b', '#073441', '#0b4a57']);
+        ctx.fillRect(0, 0, W, H);
+        if (Math.random() < 0.04 || !drops.length) drops.push({ x: rand(0, W), y: rand(0, H), r: 0, max: rand(120, 260) });
+        for (let i = drops.length - 1; i >= 0; i--) {
+          const d = drops[i];
+          d.r += 1.2;
+          const a = 1 - d.r / d.max;
+          if (a <= 0) {
+            drops.splice(i, 1);
+            continue;
+          }
+          for (let k = 0; k < 3; k++) {
+            const rr = d.r - k * 14;
+            if (rr <= 0) continue;
+            ctx.strokeStyle = `rgba(170,230,240,${a * (0.5 - k * 0.15)})`;
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.ellipse(d.x, d.y, rr, rr * 0.55, 0, 0, TAU);
+            ctx.stroke();
+          }
+        }
+      },
+    };
+  },
+  dunes: (ctx) => ({
+    draw(t, W, H) {
+      ctx.fillStyle = linear(ctx, H, ['#f6c48a', '#f0a36b', '#d9785a']);
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = 'rgba(255,240,200,.85)';
+      ctx.beginPath();
+      ctx.arc(W * 0.75, H * 0.28, Math.min(W, H) * 0.07, 0, TAU);
+      ctx.fill();
+      const layers = ['#d98a5c', '#c06f48', '#a2573a', '#7d412d', '#5a2e22'];
+      layers.forEach((c, i) => {
+        ctx.beginPath();
+        const base = H * (0.5 + i * 0.1);
+        ctx.moveTo(0, H);
+        for (let x = 0; x <= W; x += 10) {
+          ctx.lineTo(x, base + Math.sin(x * (0.002 + i * 0.0006) + t * 0.05 * (i + 1) + i * 1.7) * (40 - i * 4) + Math.sin(x * 0.009 + i) * 6);
+        }
+        ctx.lineTo(W, H);
+        ctx.fillStyle = c;
+        ctx.fill();
+      });
+    },
+  }),
+  hexgrid: (ctx) => ({
+    draw(t, W, H) {
+      ctx.fillStyle = '#05070f';
+      ctx.fillRect(0, 0, W, H);
+      const r = 26;
+      const w = r * Math.sqrt(3);
+      for (let row = -1; row * r * 1.5 < H + r; row++) {
+        for (let col = -1; col * w < W + w; col++) {
+          const x = col * w + (row % 2 ? w / 2 : 0);
+          const y = row * r * 1.5;
+          const d = Math.hypot(x - W / 2, y - H / 2);
+          const a = (Math.sin(d * 0.012 - t * 1.2) + 1) / 2;
+          ctx.beginPath();
+          for (let k = 0; k < 6; k++) {
+            const ang = Math.PI / 6 + (k * Math.PI) / 3;
+            const px = x + Math.cos(ang) * (r - 2);
+            const py = y + Math.sin(ang) * (r - 2);
+            k ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+          }
+          ctx.closePath();
+          ctx.strokeStyle = `rgba(80,160,255,${0.08 + a * 0.35})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          if (a > 0.92) {
+            ctx.fillStyle = `rgba(80,160,255,${(a - 0.92) * 1.5})`;
+            ctx.fill();
+          }
+        }
+      }
+    },
+  }),
+  mesh: blobs(['rgba(255,170,200,.8)', 'rgba(160,200,255,.8)', 'rgba(255,220,160,.7)', 'rgba(190,160,255,.7)'], '#f6f1fb', { speed: 0.8, blend: 'multiply' }),
+  ocean: blobs(['rgba(0,120,200,.5)', 'rgba(0,200,200,.35)', 'rgba(0,60,140,.6)', 'rgba(60,220,255,.25)'], '#010c1c', { speed: 0.5 }),
 };
 
 // Small static previews for the picker.

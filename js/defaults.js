@@ -28,6 +28,8 @@ export const ANIMATED = [
   { id: 'marble', name: 'Black marble', tone: 'dark' },
   { id: 'velvet', name: 'Garnet velvet', tone: 'dark' },
   { id: 'suminagashi', name: 'Suminagashi', tone: 'light' },
+  { id: 'suminagashiNoir', name: 'Black suminagashi', tone: 'dark' },
+  { id: 'suminagashiGold', name: 'Gold suminagashi', tone: 'dark' },
   { id: 'indigo', name: 'Indigo wash', tone: 'dark' },
   { id: 'waves', name: 'Waves', tone: 'dark' },
   { id: 'bubbles', name: 'Bubbles', tone: 'dark' },
@@ -35,6 +37,20 @@ export const ANIMATED = [
   { id: 'snow', name: 'Snowfall', tone: 'dark' },
   { id: 'rain', name: 'Night rain', tone: 'dark' },
   { id: 'grid', name: 'Synthwave', tone: 'dark' },
+  { id: 'fireflies', name: 'Fireflies', tone: 'dark' },
+  { id: 'matrix', name: 'Code rain', tone: 'dark' },
+  { id: 'plasma', name: 'Plasma', tone: 'dark' },
+  { id: 'ribbons', name: 'Northern lights', tone: 'dark' },
+  { id: 'galaxy', name: 'Galaxy', tone: 'dark' },
+  { id: 'meteors', name: 'Meteor shower', tone: 'dark' },
+  { id: 'topo', name: 'Topography', tone: 'dark' },
+  { id: 'embers', name: 'Embers', tone: 'dark' },
+  { id: 'sakura', name: 'Sakura', tone: 'light' },
+  { id: 'ripples', name: 'Ripples', tone: 'dark' },
+  { id: 'dunes', name: 'Dunes', tone: 'dark' },
+  { id: 'hexgrid', name: 'Hex pulse', tone: 'dark' },
+  { id: 'mesh', name: 'Pastel mesh', tone: 'light' },
+  { id: 'ocean', name: 'Deep ocean', tone: 'dark' },
 ];
 
 export const ENGINES = {
@@ -50,14 +66,35 @@ export const ENGINES = {
 };
 
 export const LAYOUTS = [
-  { id: 'centered', name: 'Centered', desc: 'Everything in one column, widgets below' },
-  { id: 'right', name: 'Widgets right', desc: 'Shortcuts in the middle, widgets in a right column' },
-  { id: 'left', name: 'Widgets left', desc: 'Widgets in a left column' },
-  { id: 'split', name: 'Split', desc: 'Weather on the left, tasks and notes on the right' },
+  { id: 'split', name: 'Beside grid', desc: 'Widgets on the left and right of the grid, centred vertically' },
+  { id: 'right', name: 'Widgets right', desc: 'All widgets in a column on the right' },
+  { id: 'left', name: 'Widgets left', desc: 'All widgets in a column on the left' },
+  { id: 'centered', name: 'Widgets below', desc: 'Everything in one column, widgets under the folders' },
   { id: 'top', name: 'Top bar', desc: 'Compact widgets in a row above the clock' },
   { id: 'dock', name: 'Dock', desc: 'Essentials in a dock at the bottom, widgets on the right' },
   { id: 'minimal', name: 'Minimal', desc: 'Clock and search only; shortcuts and widgets on demand' },
 ];
+
+// Every widget, with the side it takes in the "Beside grid" layout.
+export const WIDGET_DEFS = [
+  { id: 'weather', name: 'Weather', desc: 'Five-day forecast for a city', side: 'left' },
+  { id: 'focus', name: 'Today’s focus', desc: 'One thing to get done today', side: 'right' },
+  { id: 'todo', name: 'To do', desc: 'A simple task list', side: 'right' },
+  { id: 'notes', name: 'Notes', desc: 'Quick notes, saved as you type', side: 'right' },
+  { id: 'countdown', name: 'Countdown', desc: 'Days left until your dates', side: 'left' },
+  { id: 'clocks', name: 'World clocks', desc: 'The time in other cities', side: 'left' },
+  { id: 'timer', name: 'Timer', desc: 'Countdown timer and stopwatch', side: 'right' },
+  { id: 'habits', name: 'Habits', desc: 'Tick off daily habits and keep streaks', side: 'right' },
+  { id: 'calendar', name: 'Calendar', desc: 'This month at a glance', side: 'left' },
+  { id: 'sun', name: 'Sun and moon', desc: 'Sunrise, sunset and moon phase', side: 'left' },
+  { id: 'tides', name: 'Tides', desc: 'High and low tides for a coastal city', side: 'left' },
+  { id: 'cpu', name: 'CPU', desc: 'Processor usage of this computer', side: 'right' },
+  { id: 'memory', name: 'Memory', desc: 'RAM usage of this computer', side: 'right' },
+];
+
+export function defaultWidgets(old = {}) {
+  return WIDGET_DEFS.map((w) => ({ id: w.id, on: !!old[w.id], side: w.side }));
+}
 
 export const DEFAULT_SETTINGS = {
   // General
@@ -73,7 +110,7 @@ export const DEFAULT_SETTINGS = {
   privacy: false,
   // Interface
   theme: 'auto',
-  layout: 'centered',
+  layout: 'split',
   font: 'system',
   clockSize: 96,
   iconSize: 'medium',
@@ -104,10 +141,10 @@ export const DEFAULT_SETTINGS = {
   bgBlur: 0,
   bgSpeed: 1,
   // Widgets
-  weather: false,
+  widgets: null, // [{ id, on, side }] in display order; filled from WIDGET_DEFS
   weatherUnit: 'c',
-  todo: false,
-  notes: false,
+  weekStart: 'mon',
+  timerSound: true,
   widgetOpacity: 14,
   // Desks
   showDeskSwitcher: true,
@@ -201,13 +238,21 @@ export function emptyDesk(name) {
 export function defaultState() {
   const desk = defaultDesk();
   return {
-    v: 1,
+    v: 2,
     updatedAt: 0,
-    settings: { ...DEFAULT_SETTINGS },
+    settings: { ...DEFAULT_SETTINGS, widgets: defaultWidgets() },
     desks: [desk],
     activeDesk: desk.id,
     todos: [],
     notes: '',
     weatherCity: null,
+    focus: null,
+    countdowns: [],
+    clocks: [
+      { id: uid('c_'), tz: 'America/New_York', label: 'New York' },
+      { id: uid('c_'), tz: 'Europe/London', label: 'London' },
+      { id: uid('c_'), tz: 'Asia/Tokyo', label: 'Tokyo' },
+    ],
+    habits: [],
   };
 }

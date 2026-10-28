@@ -2,7 +2,7 @@
 // with a search box that finds any option across all sections.
 import { store } from './store.js';
 import { h, $, $$, uid, toast, download, pickFile, fileToDataUrl, formatBytes, timeAgo, debounce } from './util.js';
-import { GRADIENTS, ANIMATED, ENGINES, LAYOUTS, emptyDesk } from './defaults.js';
+import { GRADIENTS, ANIMATED, ENGINES, LAYOUTS, WIDGET_DEFS, emptyDesk } from './defaults.js';
 import { previewAnimated } from './backgrounds.js';
 import { searchCities } from './widgets.js';
 import { confirmDialog, promptDialog } from './dialogs.js';
@@ -100,12 +100,12 @@ const SECTIONS = [
     id: 'widgets',
     title: 'Widgets',
     items: [
-      { key: 'weather', label: 'Weather', desc: 'Five-day forecast for a city, no account needed', type: 'toggle', keywords: 'forecast temperature' },
-      { key: 'weatherCity', label: 'City', type: 'custom', render: cityPicker, when: (s) => s.weather, keywords: 'location' },
-      { key: 'weatherUnit', label: 'Units', type: 'segmented', options: opt([['c', '°C'], ['f', '°F']]), when: (s) => s.weather, keywords: 'celsius fahrenheit' },
-      { key: 'todo', label: 'Tasks', desc: 'A simple to-do list', type: 'toggle', keywords: 'todo checklist' },
-      { key: 'notes', label: 'Quick notes', type: 'toggle', keywords: 'notepad memo' },
-      { key: 'layout', label: 'Widget placement', desc: 'Change it in Interface › Layout', type: 'custom', render: layoutPicker, keywords: 'layout position' },
+      { label: 'Your widgets', desc: 'Turn widgets on, choose their side, and drag the arrows to reorder. On narrow windows they move into a drawer.', type: 'custom', render: widgetManager, keywords: WIDGET_DEFS.map((w) => w.name + ' ' + w.desc).join(' ') + ' todo tasks forecast pomodoro stopwatch' },
+      { key: 'weatherCity', label: 'City', desc: 'Used by Weather, Sun and moon, and Tides', type: 'custom', render: cityPicker, when: () => usesCity(), keywords: 'location' },
+      { key: 'weatherUnit', label: 'Temperature units', type: 'segmented', options: opt([['c', '°C'], ['f', '°F']]), when: () => widgetOn('weather'), keywords: 'celsius fahrenheit' },
+      { key: 'weekStart', label: 'Week starts on', type: 'segmented', options: opt([['mon', 'Monday'], ['sun', 'Sunday']]), when: () => widgetOn('calendar') || widgetOn('habits') },
+      { key: 'timerSound', label: 'Timer sound', desc: 'Chime when the timer ends', type: 'toggle', when: () => widgetOn('timer') },
+      { key: 'layout', label: 'Widget placement', desc: 'Also in Interface › Layout', type: 'custom', render: layoutPicker, keywords: 'layout position' },
     ],
   },
   {
@@ -317,6 +317,38 @@ function fmtRange(v, it) {
 }
 
 // ---- Custom controls ----
+const widgetOn = (id) => (store.settings.widgets || []).some((w) => w.id === id && w.on);
+const usesCity = () => ['weather', 'sun', 'tides'].some(widgetOn);
+
+function widgetManager() {
+  const list = store.settings.widgets;
+  const split = store.settings.layout === 'split';
+  const change = (fn) => store.update((st) => fn(st.settings.widgets));
+  return h('div', { class: 'wm-list' },
+    list.map((w, i) => {
+      const def = WIDGET_DEFS.find((d) => d.id === w.id);
+      return h('div', { class: 'wm-row' + (w.on ? ' on' : '') },
+        h('label', { class: 'switch' },
+          h('input', { type: 'checkbox', checked: w.on, onchange: (e) => change((ws) => (ws[i].on = e.target.checked)) }),
+          h('span', { class: 'slider' }),
+        ),
+        h('div', { class: 'wm-text' }, h('b', {}, def.name), h('span', {}, def.desc)),
+        split
+          ? h('div', { class: 'segmented tiny', title: 'Side of the grid' },
+              [['left', 'Left'], ['right', 'Right']].map(([v, l]) =>
+                h('button', { class: w.side === v ? 'active' : '', onclick: () => change((ws) => (ws[i].side = v)) }, l),
+              ),
+            )
+          : null,
+        h('div', { class: 'wm-order' },
+          h('button', { class: 'icon-btn', title: 'Move up', disabled: i === 0, onclick: () => change((ws) => ws.splice(i - 1, 0, ws.splice(i, 1)[0])) }, '↑'),
+          h('button', { class: 'icon-btn', title: 'Move down', disabled: i === list.length - 1, onclick: () => change((ws) => ws.splice(i + 1, 0, ws.splice(i, 1)[0])) }, '↓'),
+        ),
+      );
+    }),
+  );
+}
+
 function layoutPicker() {
   const s = store.settings;
   return h('div', { class: 'layout-grid' },

@@ -123,8 +123,7 @@ function render(info = {}) {
   renderDesks();
   // Widgets rebuild only when something they show changed (avoids refetching weather).
   const sig = JSON.stringify([
-    s.layout, s.weather, s.todo, s.notes, s.weatherUnit, s.privacy, store.state.weatherCity,
-    info.remote ? [store.state.todos, store.state.notes] : null,
+    s.layout, s.widgets, s.weatherUnit, s.weekStart, s.clock24, s.privacy, store.state.weatherCity,
   ]);
   if (sig !== widgetSig || info.remote) {
     widgetSig = sig;
