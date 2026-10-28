@@ -72,6 +72,22 @@ export const TOPOS = [
   { id: 'topoTide', name: 'Tide', tone: 'dark' },
   { id: 'topoMono', name: 'Mono', tone: 'dark' },
   { id: 'topoDeepSea', name: 'Deep sea', tone: 'dark' },
+  // Flowing lines: long wavy lines that never cross.
+  { id: 'linesPine', name: 'Pine', tone: 'dark', still: true, kind: 'lines' },
+  { id: 'linesGraphite', name: 'Graphite', tone: 'dark', still: true, kind: 'lines' },
+  { id: 'linesNavy', name: 'Navy', tone: 'dark', still: true, kind: 'lines' },
+  { id: 'linesPlum', name: 'Plum', tone: 'dark', still: true, kind: 'lines' },
+  { id: 'linesRust', name: 'Rust', tone: 'dark', still: true, kind: 'lines' },
+  { id: 'linesSteel', name: 'Steel', tone: 'dark', still: true, kind: 'lines' },
+  { id: 'linesInk', name: 'Ink & gold', tone: 'dark', still: true, kind: 'lines' },
+  { id: 'linesMoss', name: 'Moss', tone: 'dark', still: true, kind: 'lines' },
+  { id: 'linesPineDrift', name: 'Pine', tone: 'dark', kind: 'lines' },
+  { id: 'linesNavyDrift', name: 'Navy', tone: 'dark', kind: 'lines' },
+  { id: 'linesGraphiteDrift', name: 'Graphite', tone: 'dark', kind: 'lines' },
+  { id: 'linesTealDrift', name: 'Teal', tone: 'dark', kind: 'lines' },
+  { id: 'linesRoseDrift', name: 'Rose', tone: 'dark', kind: 'lines' },
+  { id: 'linesGoldDrift', name: 'Gold', tone: 'dark', kind: 'lines' },
+  { id: 'linesNeonDrift', name: 'Neon', tone: 'dark', kind: 'lines' },
 ];
 
 export const ENGINES = {

@@ -89,7 +89,7 @@ const SECTIONS = [
       { key: 'bgType', label: 'Type', type: 'segmented', options: opt([['gradient', 'Gradient'], ['animated', 'Animated'], ['topo', 'Topography'], ['image', 'Image'], ['color', 'Colour']]), keywords: 'wallpaper' },
       { key: 'bgGradient', label: 'Gradients', type: 'custom', render: gradientPicker, when: (s) => s.bgType === 'gradient', keywords: 'wallpaper colour' },
       { key: 'bgAnimated', label: 'Animated backgrounds', type: 'custom', render: animatedPicker, when: (s) => s.bgType === 'animated', keywords: 'wallpaper motion live' },
-      { key: 'bgTopo', label: 'Topographic maps', desc: 'Static maps, then slowly moving ones', type: 'custom', render: topoPicker, when: (s) => s.bgType === 'topo', keywords: 'wallpaper contour map lines topography dark' },
+      { key: 'bgTopo', label: 'Topographic maps', desc: 'Contour maps and flowing lines, static or slowly moving (∿)', type: 'custom', render: topoPicker, when: (s) => s.bgType === 'topo', keywords: 'wallpaper contour map lines topography dark' },
       { key: 'bgSpeed', label: 'Animation speed', type: 'range', min: 0.2, max: 3, step: 0.1, unit: '×', when: (s) => s.bgType === 'animated' || s.bgType === 'topo' },
       { key: 'bgImage', label: 'Your image', type: 'custom', render: imagePicker, when: (s) => s.bgType === 'image', keywords: 'wallpaper photo upload' },
       { key: 'bgColor', label: 'Colour', type: 'color', when: (s) => s.bgType === 'color' },
@@ -450,10 +450,14 @@ function topoPicker() {
     }, c, h('span', { class: 'bg-name' + (a.tone === 'light' ? ' dark-text' : '') }, a.name, a.still ? '' : ' ∿'));
   };
   return h('div', { class: 'stack' },
-    h('div', { class: 'bg-group' }, 'Static'),
-    h('div', { class: 'bg-grid' }, TOPOS.filter((a) => a.still).map(swatch)),
-    h('div', { class: 'bg-group' }, 'Animated'),
-    h('div', { class: 'bg-grid' }, TOPOS.filter((a) => !a.still).map(swatch)),
+    h('div', { class: 'bg-group' }, 'Contour maps · static'),
+    h('div', { class: 'bg-grid' }, TOPOS.filter((a) => !a.kind && a.still).map(swatch)),
+    h('div', { class: 'bg-group' }, 'Contour maps · animated'),
+    h('div', { class: 'bg-grid' }, TOPOS.filter((a) => !a.kind && !a.still).map(swatch)),
+    h('div', { class: 'bg-group' }, 'Flowing lines · static'),
+    h('div', { class: 'bg-grid' }, TOPOS.filter((a) => a.kind === 'lines' && a.still).map(swatch)),
+    h('div', { class: 'bg-group' }, 'Flowing lines · animated'),
+    h('div', { class: 'bg-grid' }, TOPOS.filter((a) => a.kind === 'lines' && !a.still).map(swatch)),
   );
 }
 

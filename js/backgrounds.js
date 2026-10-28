@@ -18,7 +18,10 @@ export function currentChoice(s = store.settings) {
 export function bgName(item) {
   if (item.type === 'gradient') return (GRADIENTS.find((g) => g.id === item.value) || {}).name || 'Gradient';
   if (item.type === 'animated') return (ANIMATED.find((g) => g.id === item.value) || {}).name || 'Animated';
-  if (item.type === 'topo') return 'Topography · ' + ((TOPOS.find((g) => g.id === item.value) || {}).name || '');
+  if (item.type === 'topo') {
+    const t = TOPOS.find((g) => g.id === item.value) || {};
+    return (t.kind === 'lines' ? 'Lines · ' : 'Topography · ') + (t.name || '') + (t.still ? '' : ' ∿');
+  }
   if (item.type === 'color') return 'Colour ' + item.value;
   return 'Your image';
 }
@@ -289,7 +292,8 @@ function makeNoise(seed) {
 // Segment pairs per marching-squares case. Edges: 0 top, 1 right, 2 bottom, 3 left.
 const MS = [[], [[3, 2]], [[2, 1]], [[3, 1]], [[0, 1]], [[3, 0], [2, 1]], [[0, 2]], [[3, 0]], [[3, 0]], [[0, 2]], [[0, 1], [3, 2]], [[0, 1]], [[3, 1]], [[2, 1]], [[3, 2]], []];
 
-function contours({ bg, line, index, hue, glow = false, alpha = 0.45, seed = 1, speed = 0, levels = 20, grid }) {
+// `flow` turns the map into long wavy lines that never cross: contours of a tilted plane bent by noise.
+function contours({ bg, line, index, hue, glow = false, alpha = 0.45, seed = 1, speed = 0, levels = 20, grid, flow, major = 5 }) {
   return (ctx) => {
     const noise = makeNoise(seed);
     let last = -1;
@@ -308,7 +312,10 @@ function contours({ bg, line, index, hue, glow = false, alpha = 0.45, seed = 1, 
         let lo = Infinity, hi = -Infinity;
         for (let j = 0; j < rows; j++)
           for (let i = 0; i < cols; i++) {
-            const v = noise((i * cell) / unit * 2.2 + seed, (j * cell) / unit * 2.2, z);
+            const x = (i * cell) / unit, y = (j * cell) / unit;
+            const v = flow
+              ? x * Math.sin(flow.angle || 0) + y * Math.cos(flow.angle || 0) + flow.amp * noise(x * (flow.freq || 0.9) + seed, y * (flow.freq || 0.9) * 1.3, z)
+              : noise(x * 2.2 + seed, y * 2.2, z);
             f[j * cols + i] = v;
             if (v < lo) lo = v;
             if (v > hi) hi = v;
@@ -331,7 +338,7 @@ function contours({ bg, line, index, hue, glow = false, alpha = 0.45, seed = 1, 
         ctx.lineJoin = 'round';
         for (let k = 1; k < levels; k++) {
           const th = lo + ((hi - lo) * k) / levels;
-          const major = k % 5 === 0;
+          const isMajor = k % major === 0;
           ctx.beginPath();
           for (let j = 0; j < rows - 1; j++)
             for (let i = 0; i < cols - 1; i++) {
@@ -354,15 +361,15 @@ function contours({ bg, line, index, hue, glow = false, alpha = 0.45, seed = 1, 
           let color;
           if (hue) {
             const hh = hue[0] + ((hue[1] - hue[0]) * k) / levels;
-            color = `hsla(${hh}, 90%, 62%, ${major ? Math.min(1, alpha * 1.8) : alpha * 0.6})`;
-          } else color = major ? index : line;
+            color = `hsla(${hh}, 90%, 62%, ${isMajor ? Math.min(1, alpha * 1.8) : alpha * 0.6})`;
+          } else color = isMajor ? index : line;
           if (glow) {
             ctx.strokeStyle = color.replace(/[\d.]+\)$/, '0.08)');
             ctx.lineWidth = lw * 6;
             ctx.stroke();
           }
           ctx.strokeStyle = color;
-          ctx.lineWidth = major ? lw * 1.6 : lw;
+          ctx.lineWidth = isMajor ? lw * 1.6 : lw;
           ctx.stroke();
         }
       },
@@ -852,6 +859,21 @@ const PAINTERS = {
   topoTide: contours({ bg: ['#06232a', '#020d10'], line: 'rgba(90,220,220,.14)', index: 'rgba(110,235,235,.42)', seed: 43, speed: 0.03, levels: 22 }),
   topoMono: contours({ bg: ['#0a0a0a', '#000'], line: 'rgba(255,255,255,.12)', index: 'rgba(255,255,255,.4)', seed: 59, speed: 0.035 }),
   topoDeepSea: contours({ bg: ['#04102a', '#000510'], hue: [200, 235], seed: 61, speed: 0.025, alpha: 0.35, levels: 26 }),
+  linesPine: contours({ bg: ['#121a17', '#0c1311'], line: 'rgba(120,170,150,.13)', index: 'rgba(120,175,155,.38)', seed: 3, levels: 34, major: 4, flow: { amp: 0.55, angle: 0.18 } }),
+  linesGraphite: contours({ bg: ['#18191b', '#0e0f10'], line: 'rgba(255,255,255,.08)', index: 'rgba(255,255,255,.26)', seed: 7, levels: 36, major: 4, flow: { amp: 0.6, angle: -0.12 } }),
+  linesNavy: contours({ bg: ['#0f1730', '#080d1c'], line: 'rgba(140,170,255,.12)', index: 'rgba(150,180,255,.36)', seed: 9, levels: 34, major: 4, flow: { amp: 0.5, angle: 0.3 } }),
+  linesPlum: contours({ bg: ['#1c1022', '#100812'], line: 'rgba(220,160,230,.11)', index: 'rgba(225,165,235,.34)', seed: 15, levels: 32, major: 4, flow: { amp: 0.65, angle: -0.25 } }),
+  linesRust: contours({ bg: ['#1b100b', '#0e0806'], line: 'rgba(220,140,90,.12)', index: 'rgba(230,150,95,.38)', seed: 19, levels: 34, major: 4, flow: { amp: 0.5, angle: 0.1 } }),
+  linesSteel: contours({ bg: ['#1a2128', '#0f1418'], line: 'rgba(170,195,215,.11)', index: 'rgba(180,205,225,.33)', seed: 21, levels: 40, major: 5, flow: { amp: 0.4, angle: 0.45, freq: 0.7 } }),
+  linesInk: contours({ bg: ['#0b0b0e', '#040405'], line: 'rgba(255,255,255,.06)', index: 'rgba(212,175,95,.42)', seed: 27, levels: 30, major: 5, flow: { amp: 0.7, angle: 0 } }),
+  linesMoss: contours({ bg: ['#161a10', '#0c0f08'], line: 'rgba(180,200,120,.11)', index: 'rgba(190,210,125,.33)', seed: 33, levels: 34, major: 4, flow: { amp: 0.55, angle: -0.4 } }),
+  linesPineDrift: contours({ bg: ['#121a17', '#0c1311'], line: 'rgba(120,170,150,.13)', index: 'rgba(120,175,155,.38)', seed: 3, levels: 34, major: 4, speed: 0.04, flow: { amp: 0.55, angle: 0.18 } }),
+  linesNavyDrift: contours({ bg: ['#0f1730', '#080d1c'], line: 'rgba(140,170,255,.12)', index: 'rgba(150,180,255,.36)', seed: 9, levels: 34, major: 4, speed: 0.04, flow: { amp: 0.5, angle: 0.3 } }),
+  linesGraphiteDrift: contours({ bg: ['#18191b', '#0e0f10'], line: 'rgba(255,255,255,.08)', index: 'rgba(255,255,255,.26)', seed: 7, levels: 36, major: 4, speed: 0.035, flow: { amp: 0.6, angle: -0.12 } }),
+  linesTealDrift: contours({ bg: ['#0a1d20', '#051012'], line: 'rgba(90,210,210,.12)', index: 'rgba(100,225,225,.38)', seed: 45, levels: 34, major: 4, speed: 0.04, flow: { amp: 0.6, angle: 0.22 } }),
+  linesRoseDrift: contours({ bg: ['#1d0f15', '#10070b'], line: 'rgba(240,140,170,.11)', index: 'rgba(245,150,180,.35)', seed: 49, levels: 32, major: 4, speed: 0.04, flow: { amp: 0.65, angle: -0.2 } }),
+  linesGoldDrift: contours({ bg: ['#0e0c08', '#060504'], line: 'rgba(255,255,255,.05)', index: 'rgba(222,180,95,.45)', seed: 57, levels: 30, major: 5, speed: 0.035, flow: { amp: 0.7, angle: 0.05 } }),
+  linesNeonDrift: contours({ bg: ['#07070d', '#000'], hue: [170, 320], glow: true, seed: 63, levels: 32, major: 4, speed: 0.045, alpha: 0.5, flow: { amp: 0.6, angle: 0.15 } }),
 };
 
 // Small static previews for the picker.
@@ -859,6 +881,6 @@ export function previewAnimated(id, canvas) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   const p = (PAINTERS[id] || PAINTERS.aurora)(ctx, W, H);
-  p.draw(id === 'starfield' || id.startsWith('topo') ? 0 : 3, W, H);
+  p.draw(id === 'starfield' || id.startsWith('topo') || id.startsWith('lines') ? 0 : 3, W, H);
   if (id === 'starfield') for (let i = 0; i < 60; i++) p.draw(i * 0.016, W, H);
 }

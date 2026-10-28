@@ -44,6 +44,7 @@ To update, pull the latest code and press the reload icon on the extension card.
 - 13 gradients.
 - 32 animated, code-drawn scenes. These include Aurora, Nebula, Constellations, Galaxy, Meteor shower, Northern lights, three suminagashi styles (classic, black and gold), Plasma, Code rain, Fireflies, Embers, Sakura, Ripples, Dunes, Topography, Hex pulse and Synthwave.
 - 16 topographic maps with real contour lines, mostly dark. 9 are static and 7 slowly move.
+- 15 "flowing lines" backgrounds: smooth, near-horizontal contour lines that never cross. 8 are static and 7 slowly drift.
 - A solid colour, or your own image.
 - **Rotation:** add several backgrounds and switch between them every N minutes or hours (optionally shuffled), on each new tab, or at set times of day.
 - Dim and blur sliders.
