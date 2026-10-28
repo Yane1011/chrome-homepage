@@ -97,11 +97,8 @@ input, select, textarea { font: inherit; color: inherit; }
   min-width: 0;
 }
 
+#corner { position: fixed; top: 16px; right: 16px; z-index: 16; display: flex; gap: 4px; }
 .corner-btn {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 5;
   width: 40px;
   height: 40px;
   border-radius: 12px;
@@ -115,7 +112,7 @@ input, select, textarea { font: inherit; color: inherit; }
 }
 .corner-btn:hover { opacity: 1; background: var(--glass); }
 #settings-btn:hover svg { transform: rotate(45deg); transition: transform .4s var(--ease); }
-#widgets-toggle { right: 60px; display: none; }
+#widgets-toggle { display: none; }
 #shortcuts-toggle { display: none; }
 
 .widgets.col {
@@ -202,7 +199,7 @@ body.narrow.has-widgets #widgets-toggle { display: grid; }
 [data-layout="minimal"] #wr > :first-child, body.narrow #wr > :first-child { margin-top: 0; }
 [data-layout="minimal"] body.drawer-open #wr, body.narrow.drawer-open #wr { transform: none; }
 [data-layout="minimal"] #wr .widget, body.narrow #wr .widget { background: var(--input); border-color: var(--panel-line); backdrop-filter: none; }
-body.drawer-open #widgets-toggle { z-index: 16; opacity: 1; }
+body.drawer-open #widgets-toggle { opacity: 1; }
 
 /* ===== Hero ===== */
 #hero { text-align: center; text-shadow: var(--text-shadow); user-select: none; }

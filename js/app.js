@@ -136,6 +136,17 @@ function render(info = {}) {
 function bindGlobal() {
   document.addEventListener('open-settings', (e) => openSettings(e.detail));
   $('#settings-btn').addEventListener('click', () => openSettings());
+  // chrome:// pages can't be opened by a plain link, so go through the tabs API.
+  for (const btn of document.querySelectorAll('#corner [data-url]')) {
+    const open = (newTab) => {
+      const url = btn.dataset.url;
+      if (typeof chrome === 'undefined' || !chrome.tabs) return void (location.href = url);
+      if (newTab || store.settings.openInNewTab) chrome.tabs.create({ url });
+      else chrome.tabs.update({ url });
+    };
+    btn.addEventListener('click', (e) => open(e.ctrlKey || e.metaKey || e.shiftKey));
+    btn.addEventListener('auxclick', (e) => e.button === 1 && open(true));
+  }
   $('#widgets-toggle').addEventListener('click', () => document.body.classList.toggle('drawer-open'));
   $('#shortcuts-toggle').addEventListener('click', () => document.body.classList.toggle('show-shortcuts'));
   $('#folder-overlay').addEventListener('mousedown', (e) => {
