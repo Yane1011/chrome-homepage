@@ -55,15 +55,16 @@ export function sun() {
     const now = Date.now();
     const p = Math.max(0, Math.min(1, (now - rise) / (set - rise)));
     const up = now >= rise && now <= set;
-    const W = 240, H = 70, r = 100;
-    const cx = W / 2, cy = H + 30;
+    // The arc sits on the horizon line and stays inside the SVG, so the sun never covers the labels.
+    const W = 240, H = 92, r = 76;
+    const cx = W / 2, cy = H - 10;
     const ang = Math.PI * (1 - p);
     const sx = cx + Math.cos(ang) * r;
     const sy = cy - Math.sin(ang) * r;
     arc.replaceChildren(
-      svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H },
+      svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H, preserveAspectRatio: 'xMidYMid meet' },
         svg('path', { d: `M${cx - r},${cy} A${r},${r} 0 0 1 ${cx + r},${cy}`, class: 'sun-path' }),
-        svg('line', { x1: 0, x2: W, y1: H - 1, y2: H - 1, class: 'sun-horizon' }),
+        svg('line', { x1: 0, x2: W, y1: cy, y2: cy, class: 'sun-horizon' }),
         up ? svg('circle', { cx: sx, cy: sy, r: 7, class: 'sun-dot' }) : null,
       ),
     );

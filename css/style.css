@@ -652,7 +652,8 @@ body.drawer-open #widgets-toggle { opacity: 1; }
 .cal-day.today.event::after { background: #fff; }
 
 /* Sun and moon */
-.sun-arc svg { display: block; overflow: visible; }
+.sun-arc svg { display: block; overflow: hidden; }
+.sun-arc { margin-bottom: 4px; }
 .sun-path { fill: none; stroke: var(--fg3); stroke-width: 1.5; stroke-dasharray: 4 4; }
 .sun-horizon { stroke: var(--border); stroke-width: 1; }
 .sun-dot { fill: #ffc940; filter: drop-shadow(0 0 6px #ffb300); }
