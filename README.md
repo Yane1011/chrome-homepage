@@ -11,6 +11,8 @@ A calm new tab page in the style of hoome.dev. It has a pinned essentials row, f
 
 To update, pull the latest code and press the reload icon on the extension card.
 
+The manifest has a fixed `key`, so the extension always gets the same ID (`fgmapfigfhcelfiahindphkoappfdpah`), whatever folder it's loaded from. That ID is what Chrome sync stores your data under, so a reinstall can find it again. To be safe, export a backup (Settings › Data) before removing the extension.
+
 ## Features
 
 **Shortcuts**
