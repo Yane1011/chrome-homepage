@@ -2,8 +2,8 @@
 // with a search box that finds any option across all sections.
 import { store } from './store.js';
 import { h, $, $$, uid, toast, download, pickFile, fileToDataUrl, formatBytes, timeAgo, debounce } from './util.js';
-import { GRADIENTS, ANIMATED, ENGINES, LAYOUTS, WIDGET_DEFS, emptyDesk } from './defaults.js';
-import { previewAnimated } from './backgrounds.js';
+import { GRADIENTS, ANIMATED, TOPOS, ENGINES, LAYOUTS, WIDGET_DEFS, emptyDesk } from './defaults.js';
+import { previewAnimated, effectiveBg, currentChoice, bgName } from './backgrounds.js';
 import { searchCities } from './widgets.js';
 import { confirmDialog, promptDialog } from './dialogs.js';
 import { importBookmarksDialog } from './bookmarks.js';
@@ -86,12 +86,14 @@ const SECTIONS = [
     id: 'background',
     title: 'Background',
     items: [
-      { key: 'bgType', label: 'Type', type: 'segmented', options: opt([['gradient', 'Gradient'], ['animated', 'Animated'], ['image', 'Image'], ['color', 'Colour']]), keywords: 'wallpaper' },
+      { key: 'bgType', label: 'Type', type: 'segmented', options: opt([['gradient', 'Gradient'], ['animated', 'Animated'], ['topo', 'Topography'], ['image', 'Image'], ['color', 'Colour']]), keywords: 'wallpaper' },
       { key: 'bgGradient', label: 'Gradients', type: 'custom', render: gradientPicker, when: (s) => s.bgType === 'gradient', keywords: 'wallpaper colour' },
       { key: 'bgAnimated', label: 'Animated backgrounds', type: 'custom', render: animatedPicker, when: (s) => s.bgType === 'animated', keywords: 'wallpaper motion live' },
-      { key: 'bgSpeed', label: 'Animation speed', type: 'range', min: 0.2, max: 3, step: 0.1, unit: '×', when: (s) => s.bgType === 'animated' },
+      { key: 'bgTopo', label: 'Topographic maps', desc: 'Static maps, then slowly moving ones', type: 'custom', render: topoPicker, when: (s) => s.bgType === 'topo', keywords: 'wallpaper contour map lines topography dark' },
+      { key: 'bgSpeed', label: 'Animation speed', type: 'range', min: 0.2, max: 3, step: 0.1, unit: '×', when: (s) => s.bgType === 'animated' || s.bgType === 'topo' },
       { key: 'bgImage', label: 'Your image', type: 'custom', render: imagePicker, when: (s) => s.bgType === 'image', keywords: 'wallpaper photo upload' },
       { key: 'bgColor', label: 'Colour', type: 'color', when: (s) => s.bgType === 'color' },
+      { key: 'bgRotation', label: 'Rotate backgrounds', desc: 'Show several backgrounds in turn, every so often or at set times of day', type: 'custom', render: rotationEditor, keywords: 'wallpaper change cycle schedule slideshow rotation timer' },
       { key: 'bgDim', label: 'Dim', type: 'range', min: 0, max: 80, step: 1, unit: '%', keywords: 'darken' },
       { key: 'bgBlur', label: 'Blur', type: 'range', min: 0, max: 30, step: 1, unit: 'px' },
     ],
@@ -195,9 +197,26 @@ export function isSettingsOpen() {
   return !!modal;
 }
 
+// A field committing on blur (e.g. a text box) re-renders the panel while the mouse is down on
+// something else, which would swallow that click. Hold the render until the press is over.
+let pressing = false;
+let pending = false;
+document.addEventListener('pointerdown', () => (pressing = true), true);
+document.addEventListener('pointerup', () => {
+  pressing = false;
+  if (pending) {
+    pending = false;
+    setTimeout(refreshSettings, 0);
+  }
+}, true);
+
 // Called on every state change while open.
 export function refreshSettings() {
   if (!modal) return;
+  if (pressing) {
+    pending = true;
+    return;
+  }
   // Don't rebuild while the user is typing in a text field.
   const a = document.activeElement;
   if (a && modal.contains(a) && a.matches('input[type=text], input:not([type]), textarea') && !a.classList.contains('settings-search')) return;
@@ -290,10 +309,29 @@ function row(it) {
       control.addEventListener('keydown', (e) => e.key === 'Enter' && control.blur());
       break;
     }
-    case 'color':
-      control = h('input', { class: 'color-input', type: 'color', value: s[it.key] });
-      control.addEventListener('input', debounce(() => set(control.value), 80));
+    case 'color': {
+      // Picker and hex field stay in step; the hex field accepts #abc or #aabbcc, with or without '#'.
+      const picker = h('input', { class: 'color-input', type: 'color', value: s[it.key] });
+      const hex = h('input', { class: 'input hex-input', type: 'text', value: s[it.key], maxlength: '7', spellcheck: 'false', 'aria-label': `${it.label} hex` });
+      picker.addEventListener('input', debounce(() => {
+        hex.value = picker.value;
+        hex.classList.remove('invalid');
+        set(picker.value);
+      }, 80));
+      const commitHex = () => {
+        const v = normalizeHex(hex.value);
+        hex.classList.toggle('invalid', !v);
+        if (!v) return;
+        hex.value = v;
+        picker.value = v;
+        if (v !== store.settings[it.key]) set(v);
+      };
+      hex.addEventListener('input', () => normalizeHex(hex.value) && commitHex());
+      hex.addEventListener('change', commitHex);
+      hex.addEventListener('keydown', (e) => e.key === 'Enter' && hex.blur());
+      control = h('div', { class: 'color-row' }, picker, hex);
       break;
+    }
     case 'info':
       control = h('span', { class: 'info-val' }, it.desc);
       return h('div', { class: 'setting' }, h('div', { class: 'setting-text' }, h('div', { class: 'setting-label' }, it.label)), control);
@@ -309,6 +347,12 @@ function row(it) {
     ),
     control,
   );
+}
+
+function normalizeHex(v) {
+  let x = (v || '').trim().replace(/^#/, '').toLowerCase();
+  if (/^[0-9a-f]{3}$/.test(x)) x = x.split('').map((c) => c + c).join('');
+  return /^[0-9a-f]{6}$/.test(x) ? '#' + x : null;
 }
 
 function fmtRange(v, it) {
@@ -394,6 +438,101 @@ function animatedPicker() {
   );
 }
 
+function topoPicker() {
+  const s = store.settings;
+  const swatch = (a) => {
+    const c = h('canvas', { width: 160, height: 100 });
+    requestAnimationFrame(() => previewAnimated(a.id, c));
+    return h('button', {
+      class: 'bg-swatch' + (s.bgTopo === a.id ? ' active' : ''),
+      title: a.name + (a.still ? '' : ' (animated)'),
+      onclick: () => store.update((st) => { st.settings.bgType = 'topo'; st.settings.bgTopo = a.id; }),
+    }, c, h('span', { class: 'bg-name' + (a.tone === 'light' ? ' dark-text' : '') }, a.name, a.still ? '' : ' ∿'));
+  };
+  return h('div', { class: 'stack' },
+    h('div', { class: 'bg-group' }, 'Static'),
+    h('div', { class: 'bg-grid' }, TOPOS.filter((a) => a.still).map(swatch)),
+    h('div', { class: 'bg-group' }, 'Animated'),
+    h('div', { class: 'bg-grid' }, TOPOS.filter((a) => !a.still).map(swatch)),
+  );
+}
+
+const EVERY = [[0, 'Each new tab'], [1, '1 minute'], [5, '5 minutes'], [15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [180, '3 hours'], [360, '6 hours'], [720, '12 hours'], [1440, 'Day']];
+const SCHEDULE_DEFAULTS = ['07:00', '12:00', '18:00', '22:00', '03:00', '09:00', '15:00', '20:00'];
+
+function bgThumb(item) {
+  if (item.type === 'animated' || item.type === 'topo') {
+    const c = h('canvas', { class: 'rot-thumb', width: 64, height: 40 });
+    requestAnimationFrame(() => previewAnimated(item.value, c));
+    return c;
+  }
+  let bg = '#000';
+  if (item.type === 'gradient') bg = (GRADIENTS.find((g) => g.id === item.value) || GRADIENTS[0]).css;
+  else if (item.type === 'color') bg = item.value;
+  else if (item.type === 'image') {
+    const src = item.value.startsWith('img_') ? store.images[item.value] : item.value;
+    bg = src ? `center / cover url("${src}")` : '#333';
+  }
+  return h('span', { class: 'rot-thumb', style: { background: bg } });
+}
+
+function rotationEditor() {
+  const r = store.settings.bgRotation;
+  const change = (fn) => store.update((st) => fn(st.settings.bgRotation));
+  const now = effectiveBg();
+  const rows = r.items.map((it, i) =>
+    h('div', { class: 'rot-row' + (r.mode !== 'off' && JSON.stringify(it) === JSON.stringify(now) ? ' current' : '') },
+      bgThumb(it),
+      h('span', { class: 'rot-name' }, bgName(it)),
+      r.mode === 'schedule'
+        ? h('input', {
+            class: 'input rot-time', type: 'time', value: it.from || '00:00', title: 'Starts at',
+            onchange: (e) => change((rr) => (rr.items[i].from = e.target.value || '00:00')),
+          })
+        : null,
+      h('div', { class: 'wm-order' },
+        h('button', { class: 'icon-btn', title: 'Move up', disabled: i === 0, onclick: () => change((rr) => rr.items.splice(i - 1, 0, rr.items.splice(i, 1)[0])) }, '↑'),
+        h('button', { class: 'icon-btn', title: 'Move down', disabled: i === r.items.length - 1, onclick: () => change((rr) => rr.items.splice(i + 1, 0, rr.items.splice(i, 1)[0])) }, '↓'),
+        h('button', { class: 'icon-btn danger', title: 'Remove', onclick: () => change((rr) => rr.items.splice(i, 1)) }, '✕'),
+      ),
+    ),
+  );
+  const cur = currentChoice();
+  const already = r.items.some((it) => it.type === cur.type && it.value === cur.value);
+  const every = h('select', { class: 'input', onchange: (e) => change((rr) => (rr.every = Number(e.target.value))) },
+    EVERY.map(([v, l]) => h('option', { value: v }, l)),
+  );
+  every.value = String(r.every);
+  return h('div', { class: 'stack' },
+    h('div', { class: 'segmented' },
+      [['off', 'Off'], ['interval', 'Every…'], ['schedule', 'By time of day']].map(([v, l]) =>
+        h('button', { class: r.mode === v ? 'active' : '', onclick: () => change((rr) => (rr.mode = v)) }, l),
+      ),
+    ),
+    r.mode === 'interval'
+      ? h('div', { class: 'row-inline rot-opts' },
+          h('span', { class: 'hint' }, 'Change every'),
+          every,
+          h('label', { class: 'rot-shuffle' },
+            h('input', { type: 'checkbox', checked: !!r.shuffle, onchange: (e) => change((rr) => (rr.shuffle = e.target.checked)) }),
+            ' Shuffle',
+          ),
+        )
+      : null,
+    r.mode === 'schedule' ? h('p', { class: 'hint' }, 'Each background starts at its time and stays until the next one.') : null,
+    rows.length ? h('div', { class: 'rot-list' }, rows) : h('p', { class: 'hint' }, 'Pick a background above, then add it here. Add as many as you like.'),
+    h('div', { class: 'row-inline' },
+      h('button', {
+        class: 'btn',
+        disabled: already || !cur.value,
+        title: already ? 'Already in the list' : '',
+        onclick: () => change((rr) => rr.items.push({ ...cur, from: SCHEDULE_DEFAULTS[rr.items.length % SCHEDULE_DEFAULTS.length] })),
+      }, `+ Add “${bgName(cur)}”`),
+    ),
+    r.mode !== 'off' && r.items.length ? h('p', { class: 'hint' }, `Showing now: ${bgName(now)}`) : null,
+  );
+}
+
 function imagePicker() {
   const s = store.settings;
   const url = h('input', { class: 'input', type: 'text', placeholder: 'Image URL (https://…)', value: s.bgImage.startsWith('img_') ? '' : s.bgImage });
@@ -412,7 +551,8 @@ function imagePicker() {
           const old = s.bgImage;
           const ref = await store.saveImage(data);
           store.setSetting('bgImage', ref);
-          if (old.startsWith('img_')) store.deleteImage(old);
+          // Keep the old upload if the rotation still uses it.
+          if (old.startsWith('img_') && !store.settings.bgRotation.items.some((it) => it.value === old)) store.deleteImage(old);
         },
       }, 'Upload…'),
     ),

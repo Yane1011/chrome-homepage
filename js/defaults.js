@@ -53,6 +53,27 @@ export const ANIMATED = [
   { id: 'ocean', name: 'Deep ocean', tone: 'dark' },
 ];
 
+// Topographic contour maps, drawn with real contour lines over a noise field.
+// `still` ones are drawn once; the others slowly morph.
+export const TOPOS = [
+  { id: 'topoMidnight', name: 'Midnight', tone: 'dark', still: true },
+  { id: 'topoCharcoal', name: 'Charcoal', tone: 'dark', still: true },
+  { id: 'topoEmerald', name: 'Emerald', tone: 'dark', still: true },
+  { id: 'topoCopper', name: 'Copper', tone: 'dark', still: true },
+  { id: 'topoViolet', name: 'Violet', tone: 'dark', still: true },
+  { id: 'topoBlueprint', name: 'Blueprint', tone: 'dark', still: true },
+  { id: 'topoSlate', name: 'Slate', tone: 'dark', still: true },
+  { id: 'topoOnyx', name: 'Onyx & gold', tone: 'dark', still: true },
+  { id: 'topoPaper', name: 'Paper', tone: 'light', still: true },
+  { id: 'topoFlow', name: 'Flow', tone: 'dark' },
+  { id: 'topoNeon', name: 'Neon', tone: 'dark' },
+  { id: 'topoEmber', name: 'Ember', tone: 'dark' },
+  { id: 'topoAurora', name: 'Aurora', tone: 'dark' },
+  { id: 'topoTide', name: 'Tide', tone: 'dark' },
+  { id: 'topoMono', name: 'Mono', tone: 'dark' },
+  { id: 'topoDeepSea', name: 'Deep sea', tone: 'dark' },
+];
+
 export const ENGINES = {
   default: { name: 'Browser default', url: null },
   google: { name: 'Google', url: 'https://www.google.com/search?q=%s' },
@@ -135,6 +156,9 @@ export const DEFAULT_SETTINGS = {
   bgType: 'gradient',
   bgGradient: 'blue',
   bgAnimated: 'aurora',
+  bgTopo: 'topoMidnight',
+  // Rotation: several backgrounds that change on an interval or by time of day.
+  bgRotation: { mode: 'off', every: 60, shuffle: false, items: [] },
   bgColor: '#20263a',
   bgImage: '',
   bgDim: 0,
@@ -240,7 +264,7 @@ export function defaultState() {
   return {
     v: 2,
     updatedAt: 0,
-    settings: { ...DEFAULT_SETTINGS, widgets: defaultWidgets() },
+    settings: { ...structuredClone(DEFAULT_SETTINGS), widgets: defaultWidgets() },
     desks: [desk],
     activeDesk: desk.id,
     todos: [],

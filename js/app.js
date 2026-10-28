@@ -3,7 +3,7 @@ import { h, $ } from './util.js';
 import { renderEssentials, renderFolders, renderFolderOverlay, closeFolder, isFolderOpen, pageMenu } from './tiles.js';
 import { initSearch, applySearchSettings, focusSearch } from './search.js';
 import { renderWidgets } from './widgets.js';
-import { applyBackground, currentTone, resumeAnimation } from './backgrounds.js';
+import { applyBackground, currentTone, resumeAnimation, bgSignature } from './backgrounds.js';
 import { openSettings, refreshSettings, isSettingsOpen } from './settings.js';
 import { closeContextMenu } from './dialogs.js';
 
@@ -180,6 +180,16 @@ function bindGlobal() {
     }
   });
   setInterval(tickClock, 1000);
+  // Rotating backgrounds: switch when the current slot or time-of-day entry changes.
+  let lastBg = bgSignature();
+  setInterval(() => {
+    const sig = bgSignature();
+    if (sig !== lastBg) {
+      lastBg = sig;
+      applyTheme();
+      applyBackground();
+    }
+  }, 5000);
 }
 
 async function main() {

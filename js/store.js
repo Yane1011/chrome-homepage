@@ -51,6 +51,8 @@ function migrate(st) {
   const base = defaultState();
   if (!st || typeof st !== 'object') return base;
   st.settings = { ...DEFAULT_SETTINGS, ...(st.settings || {}) };
+  const rot = st.settings.bgRotation || {};
+  st.settings.bgRotation = { ...DEFAULT_SETTINGS.bgRotation, ...rot, items: Array.isArray(rot.items) ? [...rot.items] : [] };
   if (!Array.isArray(st.desks) || !st.desks.length) st.desks = base.desks;
   for (const d of st.desks) {
     d.essentials = Array.isArray(d.essentials) ? d.essentials : [];

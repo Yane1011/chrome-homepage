@@ -1,17 +1,85 @@
-// Backgrounds: gradients, solid colour, your own image, and code-drawn animated scenes.
+// Backgrounds: gradients, solid colour, your own image, code-drawn animated scenes and topographic maps,
+// optionally rotating through several on an interval or by time of day.
 import { store } from './store.js';
-import { GRADIENTS, ANIMATED } from './defaults.js';
+import { GRADIENTS, ANIMATED, TOPOS } from './defaults.js';
 import { $ } from './util.js';
 
 let raf = 0;
 let painter = null;
 let running = null;
 
-export function currentTone() {
+const KEYS = { gradient: 'bgGradient', animated: 'bgAnimated', topo: 'bgTopo', image: 'bgImage', color: 'bgColor' };
+
+// The background picked in settings, as a rotation item.
+export function currentChoice(s = store.settings) {
+  return { type: s.bgType, value: s[KEYS[s.bgType]] };
+}
+
+export function bgName(item) {
+  if (item.type === 'gradient') return (GRADIENTS.find((g) => g.id === item.value) || {}).name || 'Gradient';
+  if (item.type === 'animated') return (ANIMATED.find((g) => g.id === item.value) || {}).name || 'Animated';
+  if (item.type === 'topo') return 'Topography · ' + ((TOPOS.find((g) => g.id === item.value) || {}).name || '');
+  if (item.type === 'color') return 'Colour ' + item.value;
+  return 'Your image';
+}
+
+function validItem(it) {
+  if (!it || !KEYS[it.type] || !it.value) return false;
+  if (it.type === 'image' && it.value.startsWith('img_')) return !!store.images[it.value];
+  return true;
+}
+
+// Small deterministic random in [0, 1) for a slot number, so every open tab agrees.
+function slotRand(n) {
+  let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
+  x ^= x >>> 13;
+  x = Math.imul(x, 0xc2b2ae35);
+  x ^= x >>> 16;
+  return (x >>> 0) / 4294967296;
+}
+
+let sessionPick = null;
+export function effectiveBg() {
   const s = store.settings;
-  if (s.bgType === 'gradient') return (GRADIENTS.find((g) => g.id === s.bgGradient) || GRADIENTS[0]).tone;
-  if (s.bgType === 'animated') return (ANIMATED.find((a) => a.id === s.bgAnimated) || ANIMATED[0]).tone;
-  if (s.bgType === 'color') return luminance(s.bgColor) > 0.6 ? 'light' : 'dark';
+  const r = s.bgRotation || {};
+  const items = r.mode && r.mode !== 'off' ? (r.items || []).filter(validItem) : [];
+  if (!items.length) return currentChoice(s);
+  if (r.mode === 'schedule') {
+    const now = new Date();
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const toMin = (t) => {
+      const [hh, mm] = (t || '00:00').split(':').map(Number);
+      return hh * 60 + mm;
+    };
+    const sorted = [...items].sort((x, y) => toMin(x.from) - toMin(y.from));
+    let pick = sorted[sorted.length - 1];
+    for (const it of sorted) if (toMin(it.from) <= mins) pick = it;
+    return pick;
+  }
+  // Interval: 0 means "each new tab".
+  if (!r.every) {
+    if (sessionPick == null || sessionPick >= items.length) sessionPick = Math.floor(Math.random() * items.length);
+    return items[sessionPick];
+  }
+  const period = r.every * 60e3;
+  const local = Date.now() - new Date().getTimezoneOffset() * 60e3;
+  const slot = Math.floor(local / period);
+  if (!r.shuffle || items.length < 2) return items[slot % items.length];
+  let i = Math.floor(slotRand(slot) * items.length);
+  if (i === Math.floor(slotRand(slot - 1) * items.length)) i = (i + 1) % items.length;
+  return items[i];
+}
+
+export function bgSignature() {
+  return JSON.stringify(effectiveBg());
+}
+
+export function currentTone() {
+  const bg = effectiveBg();
+  if (bg.type === 'gradient') return (GRADIENTS.find((g) => g.id === bg.value) || GRADIENTS[0]).tone;
+  if (bg.type === 'animated') return (ANIMATED.find((a) => a.id === bg.value) || ANIMATED[0]).tone;
+  if (bg.type === 'topo') return (TOPOS.find((a) => a.id === bg.value) || TOPOS[0]).tone;
+  if (bg.type === 'color') return luminance(bg.value) > 0.6 ? 'light' : 'dark';
   return 'dark';
 }
 
@@ -23,28 +91,29 @@ function luminance(hex) {
 
 export function applyBackground() {
   const s = store.settings;
+  const cur = effectiveBg();
   const bg = $('#bg');
   const canvas = $('#bg-canvas');
   bg.style.filter = s.bgBlur ? `blur(${s.bgBlur}px)` : '';
   bg.style.inset = s.bgBlur ? `-${s.bgBlur * 2}px` : '0';
+  canvas.style.filter = s.bgBlur ? `blur(${s.bgBlur}px)` : '';
   $('#bg-dim').style.background = `rgba(0,0,0,${(s.bgDim || 0) / 100})`;
 
-  let key = s.bgType;
-  if (s.bgType === 'gradient') {
-    bg.style.background = (GRADIENTS.find((g) => g.id === s.bgGradient) || GRADIENTS[0]).css;
-  } else if (s.bgType === 'color') {
-    bg.style.background = s.bgColor;
-  } else if (s.bgType === 'image') {
-    const src = s.bgImage.startsWith('img_') ? store.images[s.bgImage] : s.bgImage;
+  if (cur.type === 'gradient') {
+    bg.style.background = (GRADIENTS.find((g) => g.id === cur.value) || GRADIENTS[0]).css;
+  } else if (cur.type === 'color') {
+    bg.style.background = cur.value;
+  } else if (cur.type === 'image') {
+    const src = cur.value.startsWith('img_') ? store.images[cur.value] : cur.value;
     bg.style.background = src ? `#111 url("${src.replace(/"/g, '%22')}") center / cover no-repeat` : GRADIENTS[0].css;
-  } else if (s.bgType === 'animated') {
+  } else {
     bg.style.background = '#000';
-    key = 'animated:' + s.bgAnimated;
   }
 
-  if (s.bgType === 'animated') {
+  if (cur.type === 'animated' || cur.type === 'topo') {
     canvas.hidden = false;
-    if (running !== key) start(s.bgAnimated);
+    const still = cur.type === 'topo' && !!(TOPOS.find((t) => t.id === cur.value) || {}).still;
+    if (running !== cur.value) start(cur.value, still);
   } else {
     stop();
     canvas.hidden = true;
@@ -56,9 +125,10 @@ function stop() {
   raf = 0;
   painter = null;
   running = null;
+  window.onresize = null;
 }
 
-function start(id) {
+function start(id, still = false) {
   stop();
   const canvas = $('#bg-canvas');
   const ctx = canvas.getContext('2d');
@@ -69,11 +139,13 @@ function start(id) {
     canvas.height = innerHeight * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     painter && painter.resize && painter.resize(innerWidth, innerHeight);
+    if (still && painter) painter.draw(0, innerWidth, innerHeight);
   };
   painter = make(ctx, innerWidth, innerHeight);
-  running = 'animated:' + id;
+  running = id;
   resize();
   window.onresize = resize;
+  if (still) return;
   let t0 = performance.now();
   let t = 0;
   const loop = (now) => {
@@ -90,8 +162,10 @@ function start(id) {
 
 // Resume after the tab becomes visible again or animation settings change.
 export function resumeAnimation() {
-  if (running && !raf && painter) {
-    const id = running.split(':')[1];
+  const cur = effectiveBg();
+  const still = cur.type === 'topo' && !!(TOPOS.find((t) => t.id === cur.value) || {}).still;
+  if (running && !raf && painter && !still) {
+    const id = running;
     running = null;
     start(id);
   }
@@ -188,6 +262,112 @@ function suminagashi(bg, strong, weak) {
       }
     },
   });
+}
+
+// ---- Topographic contours: fBm value noise + marching squares ----
+function makeNoise(seed) {
+  const hash = (x, y, z) => {
+    let h = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1442695041) + Math.imul(seed, 144665);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
+  const sm = (t) => t * t * (3 - 2 * t);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const noise = (x, y, z) => {
+    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+    const xf = sm(x - xi), yf = sm(y - yi), zf = sm(z - zi);
+    const c = (dx, dy, dz) => hash(xi + dx, yi + dy, zi + dz);
+    return lerp(
+      lerp(lerp(c(0, 0, 0), c(1, 0, 0), xf), lerp(c(0, 1, 0), c(1, 1, 0), xf), yf),
+      lerp(lerp(c(0, 0, 1), c(1, 0, 1), xf), lerp(c(0, 1, 1), c(1, 1, 1), xf), yf),
+      zf,
+    );
+  };
+  return (x, y, z) => noise(x, y, z) * 0.55 + noise(x * 2.03, y * 2.03, z * 1.7) * 0.28 + noise(x * 4.1, y * 4.1, z * 2.3) * 0.17;
+}
+
+// Segment pairs per marching-squares case. Edges: 0 top, 1 right, 2 bottom, 3 left.
+const MS = [[], [[3, 2]], [[2, 1]], [[3, 1]], [[0, 1]], [[3, 0], [2, 1]], [[0, 2]], [[3, 0]], [[3, 0]], [[0, 2]], [[0, 1], [3, 2]], [[0, 1]], [[3, 1]], [[2, 1]], [[3, 2]], []];
+
+function contours({ bg, line, index, hue, glow = false, alpha = 0.45, seed = 1, speed = 0, levels = 20, grid }) {
+  return (ctx) => {
+    const noise = makeNoise(seed);
+    let last = -1;
+    return {
+      draw(t, W, H) {
+        // Animated maps redraw at ~20 fps; that is plenty for slow drift.
+        const now = performance.now();
+        if (speed && last > 0 && now - last < 50) return;
+        last = now;
+        const unit = Math.min(W, H);
+        const cell = Math.max(3, Math.round(unit / (speed ? 85 : 120)));
+        const cols = Math.ceil(W / cell) + 1;
+        const rows = Math.ceil(H / cell) + 1;
+        const z = t * speed;
+        const f = new Float32Array(cols * rows);
+        let lo = Infinity, hi = -Infinity;
+        for (let j = 0; j < rows; j++)
+          for (let i = 0; i < cols; i++) {
+            const v = noise((i * cell) / unit * 2.2 + seed, (j * cell) / unit * 2.2, z);
+            f[j * cols + i] = v;
+            if (v < lo) lo = v;
+            if (v > hi) hi = v;
+          }
+        const g = ctx.createRadialGradient(W * 0.5, H * 0.45, 0, W * 0.5, H * 0.5, Math.hypot(W, H) * 0.6);
+        g.addColorStop(0, bg[0]);
+        g.addColorStop(1, bg[1]);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        if (grid) {
+          ctx.strokeStyle = grid;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          const gs = unit / 12;
+          for (let x = 0; x < W; x += gs) (ctx.moveTo(x, 0), ctx.lineTo(x, H));
+          for (let y = 0; y < H; y += gs) (ctx.moveTo(0, y), ctx.lineTo(W, y));
+          ctx.stroke();
+        }
+        const lw = Math.max(0.6, unit / 900);
+        ctx.lineJoin = 'round';
+        for (let k = 1; k < levels; k++) {
+          const th = lo + ((hi - lo) * k) / levels;
+          const major = k % 5 === 0;
+          ctx.beginPath();
+          for (let j = 0; j < rows - 1; j++)
+            for (let i = 0; i < cols - 1; i++) {
+              const a = f[j * cols + i], b = f[j * cols + i + 1], c = f[(j + 1) * cols + i + 1], d = f[(j + 1) * cols + i];
+              const idx = (a > th ? 8 : 0) | (b > th ? 4 : 0) | (c > th ? 2 : 0) | (d > th ? 1 : 0);
+              if (idx === 0 || idx === 15) continue;
+              const x = i * cell, y = j * cell;
+              const pt = (e) => {
+                if (e === 0) return [x + ((th - a) / (b - a)) * cell, y];
+                if (e === 1) return [x + cell, y + ((th - b) / (c - b)) * cell];
+                if (e === 2) return [x + ((th - d) / (c - d)) * cell, y + cell];
+                return [x, y + ((th - a) / (d - a)) * cell];
+              };
+              for (const [e1, e2] of MS[idx]) {
+                const p1 = pt(e1), p2 = pt(e2);
+                ctx.moveTo(p1[0], p1[1]);
+                ctx.lineTo(p2[0], p2[1]);
+              }
+            }
+          let color;
+          if (hue) {
+            const hh = hue[0] + ((hue[1] - hue[0]) * k) / levels;
+            color = `hsla(${hh}, 90%, 62%, ${major ? Math.min(1, alpha * 1.8) : alpha * 0.6})`;
+          } else color = major ? index : line;
+          if (glow) {
+            ctx.strokeStyle = color.replace(/[\d.]+\)$/, '0.08)');
+            ctx.lineWidth = lw * 6;
+            ctx.stroke();
+          }
+          ctx.strokeStyle = color;
+          ctx.lineWidth = major ? lw * 1.6 : lw;
+          ctx.stroke();
+        }
+      },
+    };
+  };
 }
 
 const PAINTERS = {
@@ -656,6 +836,22 @@ const PAINTERS = {
   }),
   mesh: blobs(['rgba(255,170,200,.8)', 'rgba(160,200,255,.8)', 'rgba(255,220,160,.7)', 'rgba(190,160,255,.7)'], '#f6f1fb', { speed: 0.8, blend: 'multiply' }),
   ocean: blobs(['rgba(0,120,200,.5)', 'rgba(0,200,200,.35)', 'rgba(0,60,140,.6)', 'rgba(60,220,255,.25)'], '#010c1c', { speed: 0.5 }),
+  topoMidnight: contours({ bg: ['#0d1428', '#060a16'], line: 'rgba(140,170,255,.16)', index: 'rgba(150,180,255,.42)', seed: 11 }),
+  topoCharcoal: contours({ bg: ['#1a1b1e', '#0c0d0f'], line: 'rgba(255,255,255,.1)', index: 'rgba(255,255,255,.3)', seed: 23 }),
+  topoEmerald: contours({ bg: ['#0a2219', '#03100b'], line: 'rgba(110,230,170,.14)', index: 'rgba(120,240,180,.38)', seed: 37 }),
+  topoCopper: contours({ bg: ['#17110c', '#080604'], line: 'rgba(210,140,90,.15)', index: 'rgba(225,150,95,.45)', seed: 41 }),
+  topoViolet: contours({ bg: ['#1d1033', '#0b0617'], line: 'rgba(190,160,255,.15)', index: 'rgba(200,170,255,.4)', seed: 53 }),
+  topoBlueprint: contours({ bg: ['#123a66', '#0a2546'], line: 'rgba(255,255,255,.16)', index: 'rgba(255,255,255,.42)', seed: 67, grid: 'rgba(255,255,255,.05)' }),
+  topoSlate: contours({ bg: ['#252c36', '#141920'], line: 'rgba(170,190,215,.13)', index: 'rgba(180,200,225,.35)', seed: 71 }),
+  topoOnyx: contours({ bg: ['#101010', '#050505'], line: 'rgba(255,255,255,.07)', index: 'rgba(212,175,95,.55)', seed: 83 }),
+  topoPaper: contours({ bg: ['#f3eee4', '#e6dfd1'], line: 'rgba(120,85,50,.18)', index: 'rgba(120,85,50,.45)', seed: 97 }),
+  topoFlow: contours({ bg: ['#0e1630', '#060914'], line: 'rgba(130,170,255,.16)', index: 'rgba(140,180,255,.42)', seed: 5, speed: 0.05 }),
+  topoNeon: contours({ bg: ['#07070d', '#000'], hue: [185, 300], glow: true, seed: 13, speed: 0.06, alpha: 0.55 }),
+  topoEmber: contours({ bg: ['#1c0703', '#070100'], line: 'rgba(255,120,60,.16)', index: 'rgba(255,140,70,.5)', seed: 29, speed: 0.05 }),
+  topoAurora: contours({ bg: ['#04121a', '#01060a'], hue: [140, 280], seed: 31, speed: 0.04, alpha: 0.4 }),
+  topoTide: contours({ bg: ['#06232a', '#020d10'], line: 'rgba(90,220,220,.14)', index: 'rgba(110,235,235,.42)', seed: 43, speed: 0.03, levels: 22 }),
+  topoMono: contours({ bg: ['#0a0a0a', '#000'], line: 'rgba(255,255,255,.12)', index: 'rgba(255,255,255,.4)', seed: 59, speed: 0.035 }),
+  topoDeepSea: contours({ bg: ['#04102a', '#000510'], hue: [200, 235], seed: 61, speed: 0.025, alpha: 0.35, levels: 26 }),
 };
 
 // Small static previews for the picker.
@@ -663,6 +859,6 @@ export function previewAnimated(id, canvas) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   const p = (PAINTERS[id] || PAINTERS.aurora)(ctx, W, H);
-  p.draw(id === 'starfield' ? 0 : 3, W, H);
+  p.draw(id === 'starfield' || id.startsWith('topo') ? 0 : 3, W, H);
   if (id === 'starfield') for (let i = 0; i < 60; i++) p.draw(i * 0.016, W, H);
 }
