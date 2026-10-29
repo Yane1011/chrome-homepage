@@ -1,4 +1,4 @@
-import { defaultState, DEFAULT_SETTINGS } from './defaults.js';
+import { defaultState, DEFAULT_SETTINGS, WIDGET_DEFS, defaultWidgets } from './defaults.js';
 import { clone, debounce, uid } from './util.js';
 
 // When opened outside the extension (e.g. as a plain file), fall back to localStorage.
@@ -51,6 +51,8 @@ function migrate(st) {
   const base = defaultState();
   if (!st || typeof st !== 'object') return base;
   st.settings = { ...DEFAULT_SETTINGS, ...(st.settings || {}) };
+  const rot = st.settings.bgRotation || {};
+  st.settings.bgRotation = { ...DEFAULT_SETTINGS.bgRotation, ...rot, items: Array.isArray(rot.items) ? [...rot.items] : [] };
   if (!Array.isArray(st.desks) || !st.desks.length) st.desks = base.desks;
   for (const d of st.desks) {
     d.essentials = Array.isArray(d.essentials) ? d.essentials : [];
@@ -61,7 +63,21 @@ function migrate(st) {
   st.todos = Array.isArray(st.todos) ? st.todos : [];
   st.notes = typeof st.notes === 'string' ? st.notes : '';
   st.weatherCity = st.weatherCity || null;
-  st.v = 1;
+  st.focus = st.focus || null;
+  st.countdowns = Array.isArray(st.countdowns) ? st.countdowns : [];
+  st.clocks = Array.isArray(st.clocks) ? st.clocks : base.clocks;
+  st.habits = Array.isArray(st.habits) ? st.habits : [];
+  // v1 stored widgets as three booleans and showed them below the grid.
+  if (!Array.isArray(st.settings.widgets)) {
+    st.settings.widgets = defaultWidgets(st.settings);
+    if ((st.v || 1) < 2 && st.settings.layout === 'centered') st.settings.layout = 'split';
+  }
+  for (const def of WIDGET_DEFS) {
+    if (!st.settings.widgets.some((w) => w.id === def.id)) st.settings.widgets.push({ id: def.id, on: false, side: def.side });
+  }
+  st.settings.widgets = st.settings.widgets.filter((w) => WIDGET_DEFS.some((d) => d.id === w.id));
+  for (const k of ['weather', 'todo', 'notes']) delete st.settings[k];
+  st.v = 2;
   st.updatedAt = st.updatedAt || 0;
   return st;
 }

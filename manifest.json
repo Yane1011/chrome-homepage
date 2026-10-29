@@ -2,12 +2,13 @@
   "manifest_version": 3,
   "name": "Homepage",
   "short_name": "Homepage",
-  "version": "1.0.0",
+  "version": "1.1.1",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5pNRqnIr78Yj+EhYsnWPIOlhTMTxnSwoz1TQwb/rW91r2BbN7oo6i9i5hX4qtyw2yA7AAl3Z9pwmDXgzJOLKYXWtbYcBW3QtXVvDHbepd1eoKXvfqHzvZOIfIU3eWHWRlFhWcEht+gp0sH2iGF5ZNEjQLyFtstuN4PyVzjRJZS099FWmlw85xYTPBh1TEQE0KJ9qa4AID5tZatLjP+Pg7OgAWaEH3fvyviRPwfC4T3SmwKn/LKbg2ha+Fw3Tip/NyZazKIN7Pqe/VnLfrGkkCRdHIUR+5eSXNJYf63rr0Hs3jjg3JRx8K+aLx68ermzuRzq6qxcUZnKI34gqETPo6QIDAQAB",
   "description": "A calm new tab: essentials, folders, search, weather, tasks and notes, synced across your computers.",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
-  "permissions": ["storage", "unlimitedStorage", "search", "favicon"],
+  "permissions": ["storage", "unlimitedStorage", "search", "favicon", "system.cpu", "system.memory"],
   "optional_permissions": ["bookmarks"],
   "icons": {
     "16": "icons/icon16.png",

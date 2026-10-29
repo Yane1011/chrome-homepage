@@ -3,7 +3,7 @@ import { h, $ } from './util.js';
 import { renderEssentials, renderFolders, renderFolderOverlay, closeFolder, isFolderOpen, pageMenu } from './tiles.js';
 import { initSearch, applySearchSettings, focusSearch } from './search.js';
 import { renderWidgets } from './widgets.js';
-import { applyBackground, currentTone, resumeAnimation } from './backgrounds.js';
+import { applyBackground, currentTone, resumeAnimation, bgSignature } from './backgrounds.js';
 import { openSettings, refreshSettings, isSettingsOpen } from './settings.js';
 import { closeContextMenu } from './dialogs.js';
 
@@ -123,8 +123,7 @@ function render(info = {}) {
   renderDesks();
   // Widgets rebuild only when something they show changed (avoids refetching weather).
   const sig = JSON.stringify([
-    s.layout, s.weather, s.todo, s.notes, s.weatherUnit, s.privacy, store.state.weatherCity,
-    info.remote ? [store.state.todos, store.state.notes] : null,
+    s.layout, s.widgets, s.weatherUnit, s.weekStart, s.clock24, s.privacy, store.state.weatherCity,
   ]);
   if (sig !== widgetSig || info.remote) {
     widgetSig = sig;
@@ -137,6 +136,17 @@ function render(info = {}) {
 function bindGlobal() {
   document.addEventListener('open-settings', (e) => openSettings(e.detail));
   $('#settings-btn').addEventListener('click', () => openSettings());
+  // chrome:// pages can't be opened by a plain link, so go through the tabs API.
+  for (const btn of document.querySelectorAll('#corner [data-url]')) {
+    const open = (newTab) => {
+      const url = btn.dataset.url;
+      if (typeof chrome === 'undefined' || !chrome.tabs) return void (location.href = url);
+      if (newTab || store.settings.openInNewTab) chrome.tabs.create({ url });
+      else chrome.tabs.update({ url });
+    };
+    btn.addEventListener('click', (e) => open(e.ctrlKey || e.metaKey || e.shiftKey));
+    btn.addEventListener('auxclick', (e) => e.button === 1 && open(true));
+  }
   $('#widgets-toggle').addEventListener('click', () => document.body.classList.toggle('drawer-open'));
   $('#shortcuts-toggle').addEventListener('click', () => document.body.classList.toggle('show-shortcuts'));
   $('#folder-overlay').addEventListener('mousedown', (e) => {
@@ -170,6 +180,16 @@ function bindGlobal() {
     }
   });
   setInterval(tickClock, 1000);
+  // Rotating backgrounds: switch when the current slot or time-of-day entry changes.
+  let lastBg = bgSignature();
+  setInterval(() => {
+    const sig = bgSignature();
+    if (sig !== lastBg) {
+      lastBg = sig;
+      applyTheme();
+      applyBackground();
+    }
+  }, 5000);
 }
 
 async function main() {
